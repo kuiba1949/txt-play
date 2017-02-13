@@ -1,0 +1,217 @@
+#!/bin/bash
+# coding: utf-8
+
+## 2017-2-13, version 0.1, by Careone
+## original filename: txt-play.sh
+
+## 适用场景：
+# 1.人才市场滚动播放招聘信息（企业/岗位/要求）；
+# 2.工厂滚动播放订单生产进度（计划/在制/完成）； 
+
+### defines ###
+# 定义"换行符"为分隔符
+IFS='
+';
+
+declare -i ID=1 # 序号
+declare -i REPEAT=2 # 重复次数。（默认值:2次）
+
+#
+declare -i STEP_TIME=1 # 每行滚动的时间间隔   （默认值：1秒）
+declare -i REST_TIME=3 # 每播完一次后的停顿时间（默认值：3秒）
+
+sample_01="/home/user/sh/sample01_job.txt"
+sample_02="/home/user/sh/sample02_factory.txt"
+
+
+_option_color () {
+cat <<EOF
+Bash Shell定义文字颜色有三个参数：Style，Frontground和Background，每个参数有7个值，
+意义如下：
+
+0：黑色 
+1：蓝色 
+2：绿色 
+3：青色 
+4：红色 
+5：洋红色 
+6：黄色 
+7：白色
+----
+30-37: 字體顏色
+40-47：底色
+---- 
+字体风格：（0,3，5,6应都是正常模式）
+
+1：粗体
+
+0：恢复默认模式
+
+2：浅灰色
+
+3：正常模式 
+
+4：下划线
+
+5：（不详。应为正常模式）
+6：（不详。应为正常模式）
+
+7：字色/底色互换
+8：文字替换成空格
+9：中间删除线
+
+
+EOF
+}
+
+
+#
+_option_mode () {
+cat <<EOF
+1. 人才市场模式
+
+* 日期 		36（黄色）
+** 企业 	7 (反显色)
+*** 岗位	4（下划线），31 （蓝色）
+
+
+以！开头的表示急招/重要岗位/贵宾企业（下同）
+!* 	（粗体）暂未使用
+!**	（粗体）贵宾企业
+!***	（粗体）急招/重要岗位	36（黄色）
+
+
+--------
+
+2. 工厂生产进度模式
+
+* 计划（未开始生产)
+** 生产中
+*** 已完成
+
+!* 以！开头的表示加急订单/产品（下同）
+!**
+!***
+-----
+EOF
+}
+
+### body ###
+
+## 如果程序后面跟了文件名，则显示/滚动播放这个文件的内容
+if [ "$#" -ge 1 ] && [ -r "$1" ] && [ -s "$1" ]; then
+    file="$1"
+
+elif [ "$#" -ge 1 ] && [ ! -r "$1" ] ; then
+    echo -e "  Error: bad file/filename '$1'. abort.\n\t show sample instead." 1>&2
+    file="$sample_01"
+else
+    file="$sample_01"
+ 
+fi
+
+    if [ ! -r "$file" ] ; then
+	echo -e "  Error: no sample file '$file' found. exit. " 1>&2
+	exit 0;
+
+    fi
+
+for a in `seq 1 "$REPEAT"`; do
+
+case "$RANDOM" in
+    ## autoc: auto color for ID
+    *1 | *9)autoc=31; ;;
+    
+    *2 | *0)autoc=32; ;;
+    
+    *3)autoc=33; ;;
+    
+    *4)autoc=34; ;;
+    
+    *5)autoc=35; ;;
+    *6)autoc=36; ;;
+    *7 | 8*)autoc=37; ;;
+
+    *)color=31; ;;
+esac
+
+
+# --------
+
+for a in `cat $file`; do 
+    #---------------
+    case "$a" in
+	"  ***"*) # 以3个星号（*）开头的行
+	    color='31'
+	    SPACE='       '  # 每行前面自动加6+1个空格
+	    ;;
+	
+	"  !***"*) # 以3个星号（*）开头的行
+	    color='35'
+	    SPACE='      '  # 每行前面自动加6个空格
+	    ;;	    
+
+	#
+	*"["*) # 带中括号的行
+	    color='7;35'
+	    SPACE='  '  # 每行前面自动加2个空格
+	    NEWLINE=0
+	    ;;
+
+	"  **"*) # 以2个星号（*）开头的行
+	    color='7;35'
+	    SPACE='      '  # 每行前面自动加4+1个空格
+	    ;;
+	
+	"  !**"*) # 以2个星号（*）开头的行
+	    color='4;7;35'
+	    SPACE='    '  # 每行前面自动加4个空格
+	    ;;
+
+	#
+	"  *"*) # 以2空格1星号（*）开头的行
+	    color='33'
+	    SPACE=' '  # 每行前面加1空格
+	    ;;
+	
+	"  !*"*) # 以2空格1个星号（*）开头的行
+	    color='4;33'
+	    SPACE=''  # 每行前面不加空格
+	    ;;
+    
+    *) color='1'
+       SPACE='        '  # 每行前面自动加8个空格
+       
+      ;;
+    esac
+    #===============
+    
+    if [ "$NEWLINE" = 0 ]; then
+	## 区别：是否要显示 $ID
+	 echo -e  "\e[${autoc}m$ID\e[0m ${SPACE}\e[${color}m$a\e[0m"
+    else echo -e  "\e[${autoc}m\e[0m ${SPACE}\e[${color}m$a\e[0m"
+    fi
+    
+	
+    if [ "$NEWLINE" = 0 ]; then
+	 let "ID += 1";
+    else echo; 
+    fi
+    
+    unset NEWLINE
+
+    #let "ID += 1";
+    sleep "$STEP_TIME";
+    
+done
+
+  echo -e "\n -------- \n"
+  ID=1 # init
+ 
+ ## 每次文件显示完后，暂停3秒，然后重复下一次循环
+ sleep "$REST_TIME";
+
+ # ========
+done
+
+exit 0;
